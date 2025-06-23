@@ -304,6 +304,9 @@ tr:hover td {
         width: 100%;
         margin-bottom: 8px;
     }
+    .btn:hover, .btn-primary:hover, .btn-success:hover, .btn-warning:hover, .btn-danger:hover {
+        filter: brightness(1.1);
+    }
     table, th, td {
         font-size: 15px;
     }
@@ -319,6 +322,15 @@ tr:hover td {
     th:nth-child(8), td:nth-child(8) {
         display: none;
     }
+    .form-section, .export-section {
+        margin-bottom: 18px;
+    }
+    .form-group {
+        margin-bottom: 10px;
+    }
+    .form-group input, .form-group select {
+        margin-bottom: 4px;
+    }
 }
 @media (max-width: 480px) {
     .header h1 {
@@ -330,5 +342,11 @@ tr:hover td {
     }
     table, th, td {
         font-size: 13px;
+    }
+    .form-section, .export-section {
+        margin-bottom: 12px;
+    }
+    .form-group {
+        margin-bottom: 8px;
     }
 } 

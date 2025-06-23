@@ -1,141 +1,97 @@
-// ===== DATA LAYER: CRUD localStorage =====
-function getProducts() {
-    return JSON.parse(localStorage.getItem('products') || '[]');
+const supabaseUrl = 'https://bxyvzyiepjtlyrahjsxk.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4eXZ6eWllcGp0bHlyYWhqc3hrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2NjY4MDcsImV4cCI6MjA2NjI0MjgwN30.zFGBiU0OzZ2Ix9WjrTMP_mNXawtQYZMgdQIg3-NFMTk';
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+// Định nghĩa và gán global showTab ngay đầu file
+function showTab(tabName) {
+  const contents = document.querySelectorAll('.tab-content');
+  contents.forEach(content => content.classList.remove('active'));
+  const tabs = document.querySelectorAll('.tab');
+  tabs.forEach(tab => tab.classList.remove('active'));
+  document.getElementById(tabName).classList.add('active');
+  event.target.classList.add('active');
 }
-function saveProducts(products) {
-    localStorage.setItem('products', JSON.stringify(products));
+
+// PRODUCTS CRUD
+async function getProducts() {
+  let { data, error } = await supabase.from('products').select('*').order('id', { ascending: true });
+  if (error) { alert('Lỗi lấy sản phẩm: ' + error.message); return []; }
+  return data || [];
 }
-function getImports() {
-    return JSON.parse(localStorage.getItem('imports') || '[]');
+async function addProduct(product) {
+  const { error } = await supabase.from('products').insert([product]);
+  if (error) { alert('Lỗi thêm sản phẩm: ' + error.message); return false; }
+  return true;
 }
-function saveImports(imports) {
-    localStorage.setItem('imports', JSON.stringify(imports));
+async function updateProduct(id, updates) {
+  const { error } = await supabase.from('products').update(updates).eq('id', id);
+  if (error) { alert('Lỗi cập nhật sản phẩm: ' + error.message); return false; }
+  return true;
 }
-function getExports() {
-    return JSON.parse(localStorage.getItem('exports') || '[]');
+async function deleteProduct(id) {
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) { alert('Lỗi xóa sản phẩm: ' + error.message); return false; }
+  return true;
 }
-function saveExports(exports) {
-    localStorage.setItem('exports', JSON.stringify(exports));
+
+// IMPORTS CRUD
+async function getImports() {
+  let { data, error } = await supabase.from('imports').select('*').order('id', { ascending: true });
+  if (error) { alert('Lỗi lấy phiếu nhập: ' + error.message); return []; }
+  return data || [];
+}
+async function addImport(importItem) {
+  const { error } = await supabase.from('imports').insert([importItem]);
+  if (error) alert('Lỗi thêm phiếu nhập: ' + error.message);
+}
+async function deleteImport(id) {
+  const { error } = await supabase.from('imports').delete().eq('id', id);
+  if (error) alert('Lỗi xóa phiếu nhập: ' + error.message);
+}
+
+// EXPORTS CRUD
+async function getExports() {
+  let { data, error } = await supabase.from('exports').select('*').order('id', { ascending: true });
+  if (error) { alert('Lỗi lấy phiếu bán: ' + error.message); return []; }
+  return data || [];
+}
+async function addExport(exportItem) {
+  const { error } = await supabase.from('exports').insert([exportItem]);
+  if (error) { alert('Lỗi thêm phiếu bán: ' + error.message); return false; }
+  return true;
+}
+async function updateExport(id, updates) {
+  const { error } = await supabase.from('exports').update(updates).eq('id', id);
+  if (error) { alert('Lỗi cập nhật phiếu bán: ' + error.message); return false; }
+  return true;
+}
+async function deleteExport(id) {
+  const { error } = await supabase.from('exports').delete().eq('id', id);
+  if (error) { alert('Lỗi xóa phiếu bán: ' + error.message); return false; }
+  if (error) alert('Lỗi xóa phiếu bán: ' + error.message);
 }
 
 // ===== UI & LOGIC LAYER =====
-let products = getProducts();
-let imports = getImports();
-let exports = getExports();
-
-// Biến tạm lưu index đang sửa phiếu bán
-let editingExportIndex = null;
-// Biến tạm lưu index đang sửa phiếu nhập và sản phẩm
-let editingImportIndex = null;
-let editingProductIndex = null;
+// Đảm bảo không dùng await ngoài hàm async
+// Khởi tạo dữ liệu khi DOMContentLoaded
 
 document.addEventListener('DOMContentLoaded', function() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('importDate').value = today;
-    document.getElementById('exportDate').value = today;
-    document.getElementById('reportFromDate').value = today;
-    document.getElementById('reportToDate').value = today;
-    loadProducts();
-    loadImports();
-    loadExports();
-    updateProductSelects();
-    updateStats();
-    document.getElementById('importProduct').addEventListener('change', updateImportPrice);
-    document.getElementById('importQuantity').addEventListener('input', calculateImportTotal);
-    document.getElementById('exportProduct').addEventListener('change', updateExportPrice);
-    document.getElementById('exportQuantity').addEventListener('input', calculateExportTotal);
-    document.getElementById('restoreFile').addEventListener('change', restoreData);
+  (async () => {
+    await loadProducts();
+    await loadImports();
+    await loadExports();
+    await updateProductSelects();
+    await updateStats();
+  })();
 });
 
-function showTab(tabName) {
-    const contents = document.querySelectorAll('.tab-content');
-    contents.forEach(content => content.classList.remove('active'));
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => tab.classList.remove('active'));
-    document.getElementById(tabName).classList.add('active');
-    event.target.classList.add('active');
-}
-
 // ===== PRODUCT CRUD =====
-function addProduct() {
-    products = getProducts();
-    const code = document.getElementById('productCode').value.trim();
-    const name = document.getElementById('productName').value.trim();
-    const unit = document.getElementById('productUnit').value;
-    const importPrice = parseFloat(document.getElementById('importPrice').value) || 0;
-    const sellPrice = parseFloat(document.getElementById('sellPrice').value) || 0;
-    const minStock = parseInt(document.getElementById('minStock').value) || 10;
-    if (!code || !name) {
-        alert('Vui lòng nhập mã và tên sản phẩm!');
-        return;
-    }
-    if (editingProductIndex !== null) {
-        // Sửa sản phẩm
-        // Kiểm tra nếu đổi mã mà bị trùng mã khác
-        if (products.some((p, i) => p.code === code && i !== editingProductIndex)) {
-            alert('Mã sản phẩm đã tồn tại!');
-            return;
-        }
-        products[editingProductIndex] = {
-            ...products[editingProductIndex],
-            code, name, unit, importPrice, sellPrice, minStock
-        };
-        editingProductIndex = null;
-        document.querySelector('#products .btn-primary').textContent = "➕ Thêm sản phẩm";
-    } else {
-        if (products.find(p => p.code === code)) {
-            alert('Mã sản phẩm đã tồn tại!');
-            return;
-        }
-        const product = { code, name, unit, importPrice, sellPrice, minStock, stock: 0, totalImport: 0, totalExport: 0 };
-        products.push(product);
-    }
-    saveProducts(products);
-    loadProducts();
-    updateProductSelects();
-    updateStats();
-    document.getElementById('productCode').value = '';
-    document.getElementById('productName').value = '';
-    document.getElementById('importPrice').value = '';
-    document.getElementById('sellPrice').value = '';
-    document.getElementById('minStock').value = '10';
-}
-function deleteProduct(index) {
-    products = getProducts();
-    const product = products[index];
-    const imports = getImports();
-    const exports = getExports();
-    if (imports.some(i => i.code === product.code) || exports.some(e => e.code === product.code)) {
-        alert('Không thể xóa sản phẩm đã có phiếu nhập/xuất!');
-        return;
-    }
-    if (confirm('Bạn có chắc muốn xóa sản phẩm này?')) {
-        products.splice(index, 1);
-        saveProducts(products);
-        loadProducts();
-        updateProductSelects();
-        updateStats();
-    }
-}
-function editProduct(index) {
-    products = getProducts();
-    const product = products[index];
-    document.getElementById('productCode').value = product.code;
-    document.getElementById('productName').value = product.name;
-    document.getElementById('productUnit').value = product.unit;
-    document.getElementById('importPrice').value = product.importPrice;
-    document.getElementById('sellPrice').value = product.sellPrice;
-    document.getElementById('minStock').value = product.minStock;
-    document.querySelector('#products .btn-primary').textContent = "💾 Cập nhật sản phẩm";
-    editingProductIndex = index;
-}
-
-function loadProducts(list) {
-    products = getProducts();
+async function loadProducts(list) {
+    const products = await getProducts();
     const tbody = document.getElementById('productsTableBody');
     tbody.innerHTML = '';
     const showList = list || products;
-    showList.forEach((product, index) => {
+    showList.forEach((product) => {
         const stock = product.stock || 0;
         const profit = (product.sellPrice - product.importPrice) * (product.totalExport || 0);
         let stockStatus = 'in-stock';
@@ -158,8 +114,8 @@ function loadProducts(list) {
                 <td class="text-right">${formatCurrency(profit)}</td>
                 <td class="text-center">${stockBadge}</td>
                 <td class="text-center">
-                    <button class="btn btn-warning btn-sm" onclick="editProduct(${index})">✏️</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteProduct(${index})">🗑️</button>
+                    <button class="btn btn-warning btn-sm" onclick="editProduct(${product.id})">✏️</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteProduct(${product.id})">🗑️</button>
                 </td>
             </tr>
         `;
@@ -167,9 +123,23 @@ function loadProducts(list) {
     });
 }
 
+async function editProduct(id) {
+    const products = await getProducts();
+    const product = products.find(p => p.id === id);
+    if (!product) return;
+    document.getElementById('productCode').value = product.code;
+    document.getElementById('productName').value = product.name;
+    document.getElementById('productUnit').value = product.unit;
+    document.getElementById('importPrice').value = product.importPrice;
+    document.getElementById('sellPrice').value = product.sellPrice;
+    document.getElementById('minStock').value = product.minStock;
+    document.querySelector('#products .btn-primary').textContent = "💾 Cập nhật sản phẩm";
+    window.editingProductId = id;
+}
+
 // ===== IMPORT CRUD =====
-function editImport(index) {
-    imports = getImports();
+async function editImport(index) {
+    imports = await getImports();
     const importItem = imports[index];
     document.getElementById('importDate').value = importItem.date;
     document.getElementById('importProduct').value = importItem.code;
@@ -181,9 +151,9 @@ function editImport(index) {
     editingImportIndex = index;
 }
 
-function addImport() {
-    products = getProducts();
-    imports = getImports();
+async function addImport() {
+    products = await getProducts();
+    imports = await getImports();
     const date = document.getElementById('importDate').value;
     const productCode = document.getElementById('importProduct').value;
     const quantity = parseInt(document.getElementById('importQuantity').value) || 0;
@@ -221,8 +191,8 @@ function addImport() {
             unitPrice: product.importPrice, total: product.importPrice * quantity, note
         });
     }
-    saveProducts(products);
-    saveImports(imports);
+    await updateProduct(editingProductIndex || products.length - 1, product);
+    await updateProduct(editingImportIndex || imports.length - 1, imports[editingImportIndex]);
     loadImports();
     loadProducts();
     updateProductSelects();
@@ -233,9 +203,9 @@ function addImport() {
     document.getElementById('importTotal').value = '';
 }
 
-function deleteImport(index) {
-    imports = getImports();
-    products = getProducts();
+async function deleteImport(index) {
+    imports = await getImports();
+    products = await getProducts();
     if (confirm('Bạn có chắc muốn xóa phiếu nhập này?')) {
         const importItem = imports[index];
         const product = products.find(p => p.code === importItem.code);
@@ -244,16 +214,16 @@ function deleteImport(index) {
             product.totalImport -= importItem.quantity;
         }
         imports.splice(index, 1);
-        saveImports(imports);
-        saveProducts(products);
+        await updateProduct(editingProductIndex || products.length - 1, product);
+        await updateProduct(editingImportIndex || imports.length - 1, imports[editingImportIndex]);
         loadImports();
         loadProducts();
         updateStats();
     }
 }
 
-function loadImports() {
-    imports = getImports();
+async function loadImports() {
+    imports = await getImports();
     const tbody = document.getElementById('importTableBody');
     tbody.innerHTML = '';
     imports.forEach((importItem, index) => {
@@ -277,8 +247,8 @@ function loadImports() {
 }
 
 // ===== EXPORT CRUD =====
-function editExport(index) {
-    exports = getExports();
+async function editExport(index) {
+    exports = await getExports();
     const exportItem = exports[index];
     document.getElementById('exportDate').value = exportItem.date;
     document.getElementById('exportProduct').value = exportItem.code;
@@ -291,9 +261,9 @@ function editExport(index) {
     editingExportIndex = index;
 }
 
-function addExport() {
-    products = getProducts();
-    exports = getExports();
+async function addExport() {
+    products = await getProducts();
+    exports = await getExports();
     const date = document.getElementById('exportDate').value;
     const productCode = document.getElementById('exportProduct').value;
     const quantity = parseInt(document.getElementById('exportQuantity').value) || 0;
@@ -345,8 +315,8 @@ function addExport() {
         });
     }
 
-    saveProducts(products);
-    saveExports(exports);
+    await updateProduct(editingProductIndex || products.length - 1, product);
+    await updateProduct(editingExportIndex || exports.length - 1, exports[editingExportIndex]);
     loadExports();
     loadProducts();
     updateProductSelects();
@@ -357,9 +327,9 @@ function addExport() {
     document.getElementById('exportTotal').value = '';
 }
 
-function deleteExport(index) {
-    exports = getExports();
-    products = getProducts();
+async function deleteExport(index) {
+    exports = await getExports();
+    products = await getProducts();
     if (confirm('Bạn có chắc muốn xóa phiếu bán này?')) {
         const exportItem = exports[index];
         const product = products.find(p => p.code === exportItem.code);
@@ -368,16 +338,16 @@ function deleteExport(index) {
             product.totalExport -= exportItem.quantity;
         }
         exports.splice(index, 1);
-        saveExports(exports);
-        saveProducts(products);
+        await updateProduct(editingProductIndex || products.length - 1, product);
+        await updateProduct(editingExportIndex || exports.length - 1, exports[editingExportIndex]);
         loadExports();
         loadProducts();
         updateStats();
     }
 }
 
-function loadExports() {
-    exports = getExports();
+async function loadExports() {
+    exports = await getExports();
     const tbody = document.getElementById('exportTableBody');
     tbody.innerHTML = '';
     exports.forEach((exportItem, index) => {
@@ -401,8 +371,8 @@ function loadExports() {
 }
 
 // ===== UI/UX & FILTER =====
-function updateProductSelects() {
-    products = getProducts();
+async function updateProductSelects() {
+    products = await getProducts();
     const productSelect = document.getElementById('importProduct');
     productSelect.innerHTML = '';
     const defaultOption = document.createElement('option');
@@ -430,10 +400,10 @@ function updateProductSelects() {
     productSelect.disabled = products.length === 0;
     exportSelect.disabled = products.length === 0;
 }
-function updateStats() {
-    products = getProducts();
-    imports = getImports();
-    exports = getExports();
+async function updateStats() {
+    products = await getProducts();
+    imports = await getImports();
+    exports = await getExports();
     const totalProducts = products.length;
     const totalImportValue = imports.reduce((total, importItem) => total + importItem.total, 0);
     const totalExportValue = exports.reduce((total, exportItem) => total + exportItem.total, 0);
@@ -446,8 +416,8 @@ function updateStats() {
 function formatCurrency(value) {
     return '₫' + value.toLocaleString();
 }
-function filterProducts() {
-    products = getProducts();
+async function filterProducts() {
+    products = await getProducts();
     const searchProduct = document.getElementById('searchProduct').value.toLowerCase();
     const stockFilter = document.getElementById('stockFilter').value;
     const sortProduct = document.getElementById('sortProduct').value;
@@ -498,41 +468,48 @@ function calculateExportTotal() {
     document.getElementById('exportTotal').value = total.toFixed(2);
 }
 
-function exportToExcel(type) {
+async function exportToExcel(type) {
     let data, filename, sheetName;
     if (type === 'products') {
-        data = getProducts();
+        data = (await getProducts()).map(({id, ...rest}) => rest);
         filename = 'DanhMucSanPham.xlsx';
         sheetName = 'Sản phẩm';
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, filename);
     } else if (type === 'import') {
-        data = getImports();
+        data = (await getImports()).map(({id, ...rest}) => rest);
         filename = 'NhapHang.xlsx';
         sheetName = 'Nhập hàng';
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, filename);
     } else if (type === 'export') {
-        data = getExports();
+        data = (await getExports()).map(({id, ...rest}) => rest);
         filename = 'BanHang.xlsx';
         sheetName = 'Bán hàng';
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, filename);
     } else {
-        data = [
-            ...getProducts().map(d => ({...d, _type: 'Sản phẩm'})),
-            ...getImports().map(d => ({...d, _type: 'Nhập hàng'})),
-            ...getExports().map(d => ({...d, _type: 'Bán hàng'}))
-        ];
+        // Xuất tất cả: mỗi loại 1 sheet
+        const products = (await getProducts()).map(({id, ...rest}) => rest);
+        const imports = (await getImports()).map(({id, ...rest}) => rest);
+        const exports = (await getExports()).map(({id, ...rest}) => rest);
         filename = 'TatCaDuLieu.xlsx';
-        sheetName = 'Tất cả';
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(products), 'Sản phẩm');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(imports), 'Nhập hàng');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exports), 'Bán hàng');
+        XLSX.writeFile(wb, filename);
     }
-    if (!data.length) {
-        alert('Không có dữ liệu để xuất!');
-        return;
-    }
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-    XLSX.writeFile(wb, filename);
 }
 
-function backupData() {
-    const data = { products: getProducts(), imports: getImports(), exports: getExports() };
+async function backupData() {
+    const data = { products: await getProducts(), imports: await getImports(), exports: await getExports() };
     const json = JSON.stringify(data);
     const blob = new Blob([json], { type: 'application/json' });
     const link = document.createElement('a');
@@ -546,12 +523,15 @@ function restoreData(event) {
     const file = event.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
             const json = e.target.result;
             const data = JSON.parse(json);
             localStorage.setItem('products', JSON.stringify(data.products || []));
             localStorage.setItem('imports', JSON.stringify(data.imports || []));
             localStorage.setItem('exports', JSON.stringify(data.exports || []));
+            products = await getProducts();
+            imports = await getImports();
+            exports = await getExports();
             loadProducts();
             loadImports();
             loadExports();
@@ -562,7 +542,7 @@ function restoreData(event) {
     }
 }
 
-function generateReport() {
+async function generateReport() {
     const fromDate = document.getElementById('reportFromDate').value;
     const toDate = document.getElementById('reportToDate').value;
     const reportType = document.getElementById('reportType').value;
@@ -612,7 +592,7 @@ function generateReport() {
         summaryTh1.textContent = 'Tổng sản phẩm';
         const summaryTd1 = document.createElement('td');
         summaryTd1.colSpan = 5;
-        summaryTd1.textContent = getProducts().length;
+        summaryTd1.textContent = await getProducts().length;
         summaryRow.appendChild(summaryTh1);
         summaryRow.appendChild(summaryTd1);
         reportTableBody.appendChild(summaryRow);
@@ -623,7 +603,7 @@ function generateReport() {
         summaryTh2.textContent = 'Tổng nhập (VND)';
         const summaryTd2 = document.createElement('td');
         summaryTd2.colSpan = 5;
-        summaryTd2.textContent = formatCurrency(getImports().reduce((total, importItem) => total + importItem.total, 0));
+        summaryTd2.textContent = formatCurrency(await getImports().reduce((total, importItem) => total + importItem.total, 0));
         summaryRow2.appendChild(summaryTh2);
         summaryRow2.appendChild(summaryTd2);
         reportTableBody.appendChild(summaryRow2);
@@ -634,7 +614,7 @@ function generateReport() {
         summaryTh3.textContent = 'Tổng bán (VND)';
         const summaryTd3 = document.createElement('td');
         summaryTd3.colSpan = 5;
-        summaryTd3.textContent = formatCurrency(getExports().reduce((total, exportItem) => total + exportItem.total, 0));
+        summaryTd3.textContent = formatCurrency(await getExports().reduce((total, exportItem) => total + exportItem.total, 0));
         summaryRow3.appendChild(summaryTh3);
         summaryRow3.appendChild(summaryTd3);
         reportTableBody.appendChild(summaryRow3);
@@ -645,14 +625,14 @@ function generateReport() {
         summaryTh4.textContent = 'Lợi nhuận (VND)';
         const summaryTd4 = document.createElement('td');
         summaryTd4.colSpan = 5;
-        const totalProfit = getExports().reduce((total, exportItem) => total + exportItem.total, 0) - getImports().reduce((total, importItem) => total + importItem.total, 0);
+        const totalProfit = await getExports().reduce((total, exportItem) => total + exportItem.total, 0) - await getImports().reduce((total, importItem) => total + importItem.total, 0);
         summaryTd4.textContent = formatCurrency(totalProfit);
         summaryRow4.appendChild(summaryTh4);
         summaryRow4.appendChild(summaryTd4);
         reportTableBody.appendChild(summaryRow4);
     } else if (reportType === 'product') {
         // Báo cáo theo sản phẩm
-        getProducts().forEach(product => {
+        await getProducts().forEach(async product => {
             const row = document.createElement('tr');
             const td1 = document.createElement('td');
             td1.textContent = product.code;
@@ -677,13 +657,13 @@ function generateReport() {
     } else if (reportType === 'daily') {
         // Báo cáo theo ngày
         const dailyReport = {};
-        getImports().forEach(importItem => {
+        await getImports().forEach(async importItem => {
             if (!dailyReport[importItem.date]) {
                 dailyReport[importItem.date] = { totalImport: 0, totalExport: 0 };
             }
             dailyReport[importItem.date].totalImport += importItem.total;
         });
-        getExports().forEach(exportItem => {
+        await getExports().forEach(async exportItem => {
             if (!dailyReport[exportItem.date]) {
                 dailyReport[exportItem.date] = { totalImport: 0, totalExport: 0 };
             }
@@ -708,4 +688,24 @@ function generateReport() {
     }
 }
 
-// Các hàm backupData, restoreData, clearAllData, exportToExcel, generateReport giữ nguyên như cũ nếu có trong HTML gốc. 
+async function addProductFromForm() {
+  const code = document.getElementById('productCode').value;
+  const name = document.getElementById('productName').value;
+  const unit = document.getElementById('productUnit').value;
+  const importPrice = parseFloat(document.getElementById('importPrice').value) || 0;
+  const sellPrice = parseFloat(document.getElementById('sellPrice').value) || 0;
+  const minStock = parseInt(document.getElementById('minStock').value) || 10;
+  const product = { code, name, unit, importPrice, sellPrice, minStock, stock: 0, totalImport: 0, totalExport: 0 };
+  let ok = false;
+  if (window.editingProductId) {
+    ok = await updateProduct(window.editingProductId, product);
+    window.editingProductId = null;
+    document.querySelector('#products .btn-primary').textContent = "➕ Thêm sản phẩm";
+  } else {
+    ok = await addProduct(product);
+  }
+  if (ok) {
+    alert('Đã lưu sản phẩm!');
+    loadProducts();
+  }
+} 
