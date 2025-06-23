@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống quản lý nhập-bán hàng</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Hệ thống quản lý nhập-bán hàng</h1>
+            <p>Quản lý kho hàng thông minh và hiệu quả</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('products')">📦 Danh mục sản phẩm</button>
+            <button class="tab" onclick="showTab('import')">📥 Nhập hàng</button>
+            <button class="tab" onclick="showTab('export')">📤 Bán hàng</button>
+            <button class="tab" onclick="showTab('reports')">📊 Báo cáo</button>
+            <button class="tab" onclick="showTab('settings')">⚙️ Xuất dữ liệu</button>
+        </div>
+
+        <!-- Tab Danh mục sản phẩm -->
+        <div id="products" class="tab-content active">
+            <div class="form-section">
+                <h3>🔧 Thêm sản phẩm mới</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Mã sản phẩm:</label>
+                        <input type="text" id="productCode" placeholder="SP001">
+                    </div>
+                    <div class="form-group">
+                        <label>Tên sản phẩm:</label>
+                        <input type="text" id="productName" placeholder="Nhập tên sản phẩm">
+                    </div>
+                    <div class="form-group">
+                        <label>Đơn vị tính:</label>
+                        <select id="productUnit">
+                            <option value="Cái">Cái</option>
+                            <option value="Kg">Kg</option>
+                            <option value="Lít">Lít</option>
+                            <option value="Hộp">Hộp</option>
+                            <option value="Thùng">Thùng</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Giá nhập:</label>
+                        <input type="number" id="importPrice" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Giá bán:</label>
+                        <input type="number" id="sellPrice" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Mức tồn kho tối thiểu:</label>
+                        <input type="number" id="minStock" placeholder="10" value="10">
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary" onclick="addProduct()">➕ Thêm sản phẩm</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="search-filter">
+                <div class="form-group">
+                    <label>Tìm kiếm:</label>
+                    <input type="text" id="searchProduct" placeholder="Tìm theo tên hoặc mã sản phẩm" onkeyup="filterProducts()">
+                </div>
+                <div class="form-group">
+                    <label>Trạng thái kho:</label>
+                    <select id="stockFilter" onchange="filterProducts()">
+                        <option value="">Tất cả</option>
+                        <option value="in-stock">Còn hàng</option>
+                        <option value="low-stock">Sắp hết</option>
+                        <option value="out-of-stock">Hết hàng</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Sắp xếp:</label>
+                    <select id="sortProduct" onchange="filterProducts()">
+                        <option value="name">Tên A-Z</option>
+                        <option value="code">Mã sản phẩm</option>
+                        <option value="stock">Tồn kho</option>
+                        <option value="profit">Lợi nhuận</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-success" onclick="filterProducts()">🔍 Lọc</button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="productsTable">
+                    <thead>
+                        <tr>
+                            <th>Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th>Đơn vị</th>
+                            <th class="text-right">Giá nhập</th>
+                            <th class="text-right">Giá bán</th>
+                            <th class="text-right">Tồn kho</th>
+                            <th class="text-right">Lợi nhuận/SP</th>
+                            <th class="text-center">Trạng thái</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTableBody">
+                        <!-- Dữ liệu sẽ được thêm bằng JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Nhập hàng -->
+        <div id="import" class="tab-content">
+            <div class="form-section">
+                <h3>📥 Thêm phiếu nhập hàng</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ngày nhập:</label>
+                        <input type="date" id="importDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Sản phẩm:</label>
+                        <select id="importProduct">
+                            <option value="">Chọn sản phẩm</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Số lượng nhập:</label>
+                        <input type="number" id="importQuantity" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Đơn giá nhập:</label>
+                        <input type="number" id="importUnitPrice" placeholder="0" readonly>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Thành tiền:</label>
+                        <input type="number" id="importTotal" placeholder="0" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Ghi chú:</label>
+                        <input type="text" id="importNote" placeholder="Ghi chú thêm...">
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="addImport()">➕ Thêm phiếu nhập</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="importTable">
+                    <thead>
+                        <tr>
+                            <th>Ngày nhập</th>
+                            <th>Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th class="text-right">Số lượng</th>
+                            <th class="text-right">Đơn giá</th>
+                            <th class="text-right">Thành tiền</th>
+                            <th>Ghi chú</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="importTableBody">
+                        <!-- Dữ liệu sẽ được thêm bằng JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Bán hàng -->
+        <div id="export" class="tab-content">
+            <div class="form-section">
+                <h3>📤 Thêm phiếu bán hàng</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Ngày bán:</label>
+                        <input type="date" id="exportDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Sản phẩm:</label>
+                        <select id="exportProduct">
+                            <option value="">Chọn sản phẩm</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Số lượng bán:</label>
+                        <input type="number" id="exportQuantity" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Đơn giá bán:</label>
+                        <input type="number" id="exportUnitPrice" placeholder="0" readonly>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Thành tiền:</label>
+                        <input type="number" id="exportTotal" placeholder="0" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Khách hàng:</label>
+                        <input type="text" id="exportCustomer" placeholder="Tên khách hàng">
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="addExport()">➕ Thêm phiếu bán</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table id="exportTable">
+                    <thead>
+                        <tr>
+                            <th>Ngày bán</th>
+                            <th>Mã SP</th>
+                            <th>Tên sản phẩm</th>
+                            <th class="text-right">Số lượng</th>
+                            <th class="text-right">Đơn giá</th>
+                            <th class="text-right">Thành tiền</th>
+                            <th>Khách hàng</th>
+                            <th class="text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="exportTableBody">
+                        <!-- Dữ liệu sẽ được thêm bằng JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab Báo cáo -->
+        <div id="reports" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Tổng sản phẩm</h3>
+                    <div class="value" id="totalProducts">0</div>
+                </div>
+                <div class="stat-card success">
+                    <h3>Tổng nhập (VND)</h3>
+                    <div class="value" id="totalImportValue">0</div>
+                </div>
+                <div class="stat-card warning">
+                    <h3>Tổng bán (VND)</h3>
+                    <div class="value" id="totalExportValue">0</div>
+                </div>
+                <div class="stat-card danger">
+                    <h3>Lợi nhuận (VND)</h3>
+                    <div class="value" id="totalProfit">0</div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>📊 Báo cáo chi tiết</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Từ ngày:</label>
+                        <input type="date" id="reportFromDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Đến ngày:</label>
+                        <input type="date" id="reportToDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Loại báo cáo:</label>
+                        <select id="reportType">
+                            <option value="summary">Tổng quan</option>
+                            <option value="product">Theo sản phẩm</option>
+                            <option value="daily">Theo ngày</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary" onclick="generateReport()">📈 Tạo báo cáo</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="reportResult" style="display: none;">
+                <h3>Kết quả báo cáo</h3>
+                <div class="table-container">
+                    <table id="reportTable">
+                        <thead id="reportTableHead">
+                            <!-- Header sẽ được tạo động -->
+                        </thead>
+                        <tbody id="reportTableBody">
+                            <!-- Dữ liệu sẽ được tạo động -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Xuất dữ liệu -->
+        <div id="settings" class="tab-content">
+            <div class="export-section">
+                <h3>📁 Xuất dữ liệu Excel</h3>
+                <p>Xuất toàn bộ dữ liệu thành file Excel để lưu trữ hoặc phân tích</p>
+                <br>
+                <div class="form-row">
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="exportToExcel('products')">📦 Xuất danh mục sản phẩm</button>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="exportToExcel('import')">📥 Xuất dữ liệu nhập hàng</button>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-success" onclick="exportToExcel('export')">📤 Xuất dữ liệu bán hàng</button>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary" onclick="exportToExcel('all')">📊 Xuất tất cả dữ liệu</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>💾 Sao lưu và khôi phục</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <button class="btn btn-warning" onclick="backupData()">💾 Sao lưu dữ liệu</button>
+                    </div>
+                    <div class="form-group">
+                        <input type="file" id="restoreFile" accept=".json" style="display: none;">
+                        <button class="btn btn-warning" onclick="document.getElementById('restoreFile').click()">📥 Khôi phục dữ liệu</button>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-danger" onclick="clearAllData()">🗑️ Xóa tất cả dữ liệu</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="assets/js/qlbh.js"></script>
+</body>
+</html>
