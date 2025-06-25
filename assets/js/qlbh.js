@@ -13,6 +13,17 @@ function showTab(tabName) {
   event.target.classList.add('active');
 }
 
+// Định nghĩa lại hàm refreshAllUI để tránh lỗi ReferenceError
+async function refreshAllUI() {
+    await loadProducts();
+    await loadImports();
+    await loadExports();
+    await updateProductSelects();
+    await updateStats();
+    attachExportButtonHandler();
+    attachImportButtonHandler();
+}
+
 // PRODUCTS CRUD
 async function getProducts() {
   try {
@@ -39,6 +50,7 @@ async function updateProduct(id, updates) {
 async function deleteProduct(id) {
   const { error } = await supabaseClient.from('products').delete().eq('id', id);
   if (error) { alert('Lỗi xóa sản phẩm: ' + error.message); return false; }
+  await refreshAllUI();
   return true;
 }
 
@@ -64,8 +76,6 @@ async function addImport() {
         const date = document.getElementById('importDate').value;
         const note = document.getElementById('importNote').value || '';
 
-        console.log('Form values:', { productCode, quantity, importPrice, date, note });
-
         // Kiểm tra dữ liệu đầu vào
         if (!productCode || !quantity || !importPrice || !date) {
             alert('Vui lòng nhập đầy đủ thông tin!');
@@ -85,8 +95,6 @@ async function addImport() {
             note: note
         };
 
-        console.log('Data to insert:', importRecord);
-
         // Insert vào Supabase
         const { data, error } = await supabaseClient
             .from('imports')
@@ -94,12 +102,10 @@ async function addImport() {
             .select();
 
         if (error) {
-            console.error('Supabase error details:', error);
             alert('Lỗi insert: ' + error.message);
             return;
         }
 
-        console.log('Insert thành công:', data);
         alert('Thêm phiếu nhập thành công!');
 
         // Reset form
@@ -110,22 +116,16 @@ async function addImport() {
         document.getElementById('importNote').value = '';
         document.getElementById('importTotal').value = '';
 
-        // Load lại danh sách nhập hàng (nếu có hàm này)
-        if (typeof loadImports === 'function') {
-            loadImports();
-        }
-        // Cập nhật tồn kho sản phẩm
-        await updateAllProductStocks();
+        // Cập nhật toàn bộ UI
+        await refreshAllUI();
     } catch (error) {
-        console.error('Lỗi bất ngờ:', error);
         alert('Có lỗi xảy ra: ' + error.message);
     }
 }
 async function deleteImport(id) {
   const { error } = await supabaseClient.from('imports').delete().eq('id', id);
   if (error) alert('Lỗi xóa phiếu nhập: ' + error.message);
-  // Cập nhật tồn kho sản phẩm
-  await updateAllProductStocks();
+  await refreshAllUI();
 }
 
 // EXPORTS CRUD
@@ -141,16 +141,15 @@ async function getExports() {
     return [];
   }
 }
-async function addExport(exportItem) {
-  console.log('Export record gửi lên Supabase:', exportItem);
+async function insertExport(exportItem) {
   const { data, error } = await supabaseClient.from('exports').insert([exportItem]);
+  console.log('Supabase insert result:', { data, error });
   if (error) {
-    console.error('Supabase error details:', error);
+    console.error('Supabase error details:', error, exportItem);
     alert('Lỗi thêm phiếu bán: ' + error.message);
     return false;
   }
-  // Cập nhật tồn kho sản phẩm
-  await updateAllProductStocks();
+  await refreshAllUI();
   return true;
 }
 async function updateExport(id, updates) {
@@ -158,12 +157,22 @@ async function updateExport(id, updates) {
   if (error) { alert('Lỗi cập nhật phiếu bán: ' + error.message); return false; }
   return true;
 }
-async function deleteExport(id) {
-  const { error } = await supabaseClient.from('exports').delete().eq('id', id);
-  if (error) { alert('Lỗi xóa phiếu bán: ' + error.message); return false; }
-  // Cập nhật tồn kho sản phẩm
-  await updateAllProductStocks();
-  return true;
+async function deleteExport(index) {
+    const exports = await getExports();
+    const exportItem = exports[index];
+    if (!exportItem || !exportItem.id) {
+        alert('Không xác định được phiếu bán để xóa!');
+        return;
+    }
+    if (confirm('Bạn có chắc muốn xóa phiếu bán này?')) {
+        const { error } = await supabaseClient.from('exports').delete().eq('id', exportItem.id);
+        if (error) {
+            alert('Lỗi xóa phiếu bán: ' + error.message);
+            return;
+        }
+        alert('Đã xóa phiếu bán!');
+        await refreshAllUI();
+    }
 }
 
 // ===== UI & LOGIC LAYER =====
@@ -172,11 +181,9 @@ async function deleteExport(id) {
 
 document.addEventListener('DOMContentLoaded', function() {
   (async () => {
-    await loadProducts();
-    await loadImports();
-    await loadExports();
-    await updateProductSelects();
-    await updateStats();
+    await refreshAllUI();
+    attachExportButtonHandler();
+    attachImportButtonHandler();
   })();
 });
 
@@ -190,7 +197,6 @@ async function loadProducts(list) {
         const stock = Number(product.stock) || 0;
         const importPrice = Number(product.import_price) || 0;
         const sellPrice = Number(product.sell_price) || 0;
-        const profit = (sellPrice - importPrice) * (Number(product.total_export) || 0);
         let stockStatus = 'in-stock';
         let stockBadge = '<span class="badge badge-success">Còn hàng</span>';
         if (stock === 0) {
@@ -208,7 +214,6 @@ async function loadProducts(list) {
                 <td class="text-right">${formatCurrency(importPrice)}</td>
                 <td class="text-right">${formatCurrency(sellPrice)}</td>
                 <td class="text-right">${stock}</td>
-                <td class="text-right">${formatCurrency(profit)}</td>
                 <td class="text-center">${stockBadge}</td>
                 <td class="text-center">
                     <button class="btn btn-warning btn-sm" onclick="editProduct(${product.id})">✏️</button>
@@ -220,121 +225,62 @@ async function loadProducts(list) {
     });
 }
 
-async function editProduct(id) {
+async function editProduct(index) {
     const products = await getProducts();
-    const product = products.find(p => p.id === id);
-    if (!product) return;
+    const product = products[index];
     document.getElementById('productCode').value = product.code;
     document.getElementById('productName').value = product.name;
     document.getElementById('productUnit').value = product.unit;
     document.getElementById('importPrice').value = product.import_price;
     document.getElementById('sellPrice').value = product.sell_price;
     document.getElementById('minStock').value = product.min_stock;
+    window.editingProductId = product.id;
     document.querySelector('#products .btn-primary').textContent = "💾 Cập nhật sản phẩm";
-    window.editingProductId = id;
+}
+
+async function updateProductFromForm() {
+    const id = window.editingProductId;
+    if (!id) {
+        alert('Không xác định được sản phẩm để cập nhật!');
+        return;
+    }
+    const code = document.getElementById('productCode').value;
+    const name = document.getElementById('productName').value;
+    const unit = document.getElementById('productUnit').value;
+    const import_price = parseFloat(document.getElementById('importPrice').value) || 0;
+    const sell_price = parseFloat(document.getElementById('sellPrice').value) || 0;
+    const min_stock = parseInt(document.getElementById('minStock').value) || 10;
+    const updates = { code, name, unit, import_price, sell_price, min_stock };
+    const { error } = await supabaseClient.from('products').update(updates).eq('id', id);
+    if (error) {
+        alert('Lỗi cập nhật sản phẩm: ' + error.message);
+        return;
+    }
+    alert('Đã cập nhật sản phẩm!');
+    window.editingProductId = null;
+    document.querySelector('#products .btn-primary').textContent = "+ Thêm sản phẩm";
+    await refreshAllUI();
+}
+
+async function deleteProduct(index) {
+    const products = await getProducts();
+    const product = products[index];
+    if (!product || !product.id) {
+        alert('Không xác định được sản phẩm để xóa!');
+        return;
+    }
+    if (confirm('Bạn có chắc muốn xóa sản phẩm này?')) {
+        const { error } = await supabaseClient.from('products').delete().eq('id', product.id);
+        if (error) {
+            alert('Lỗi xóa sản phẩm: ' + error.message);
+            return;
+        }
+        alert('Đã xóa sản phẩm!');
+        await refreshAllUI();
+    }
 }
 
 // ===== IMPORT CRUD =====
-async function editImport(index) {
-    imports = await getImports();
-    const importItem = imports[index];
-    document.getElementById('importDate').value = importItem.import_date;
-    document.getElementById('importProduct').value = importItem.product_code;
-    document.getElementById('importQuantity').value = importItem.quantity;
-    document.getElementById('importUnitPrice').value = importItem.import_price;
-    document.getElementById('importTotal').value = importItem.total_amount;
-    document.getElementById('importNote').value = importItem.note;
-    document.querySelector('#import .btn-success').textContent = "💾 Cập nhật phiếu nhập";
-    editingImportIndex = index;
-}
-
-async function addImportFromForm() {
-    products = await getProducts();
-    imports = await getImports();
-    const date = document.getElementById('importDate').value;
-    const productCode = document.getElementById('importProduct').value;
-    const quantity = parseInt(document.getElementById('importQuantity').value) || 0;
-    const note = document.getElementById('importNote').value;
-    const product = products.find(p => p.code === productCode);
-    if (!date || !productCode || quantity <= 0) {
-        alert('Vui lòng nhập đầy đủ thông tin!');
-        return;
-    }
-    if (!product) {
-        alert('Sản phẩm không tồn tại!');
-        return;
-    }
-    // Chuẩn hóa trường date về ISO string
-    let dateValue = date;
-    if (dateValue) {
-        // Nếu là dạng MM/DD/YYYY thì chuyển về ISO
-        const d = new Date(dateValue);
-        if (!isNaN(d.getTime())) {
-            dateValue = d.toISOString();
-        } else {
-            dateValue = new Date().toISOString();
-        }
-    } else {
-        dateValue = new Date().toISOString();
-    }
-    const importItem = {
-        code: product.code || '',
-        name: product.name || '',
-        unit: product.unit || '',
-        import_price: product.import_price || 0,
-        sell_price: product.sell_price || 0,
-        min_stock: product.min_stock || 0,
-        stock: product.stock || 0,
-        total_import: product.total_import || 0,
-        total_export: product.total_export || 0,
-        date: dateValue,
-        quantity: quantity || 0,
-        note: note || ''
-    };
-    // Kiểm tra chi tiết
-    for (const key in importItem) {
-        if (importItem[key] === undefined || importItem[key] === null) {
-            alert(`Trường ${key} đang bị thiếu hoặc null!`);
-            console.error('importItem bị thiếu:', importItem, 'Trường lỗi:', key);
-            return;
-        }
-        if (typeof importItem[key] === 'string' && importItem[key].trim() === '') {
-            alert(`Trường ${key} đang bị rỗng!`);
-            console.error('importItem bị rỗng:', importItem, 'Trường lỗi:', key);
-            return;
-        }
-    }
-    console.log('importItem gửi lên Supabase:', importItem);
-    await addImport(importItem);
-    await loadImports();
-    await loadProducts();
-    await updateProductSelects();
-    await updateStats();
-    document.getElementById('importQuantity').value = '';
-    document.getElementById('importNote').value = '';
-    document.getElementById('importUnitPrice').value = '';
-    document.getElementById('importTotal').value = '';
-}
-
-async function deleteImport(index) {
-    imports = await getImports();
-    products = await getProducts();
-    if (confirm('Bạn có chắc muốn xóa phiếu nhập này?')) {
-        const importItem = imports[index];
-        const product = products.find(p => p.code === importItem.product_code);
-        if (product) {
-            product.stock -= importItem.quantity;
-            product.total_import -= importItem.quantity;
-        }
-        imports.splice(index, 1);
-        await updateProduct(editingProductIndex || products.length - 1, product);
-        await updateProduct(editingImportIndex || imports.length - 1, imports[editingImportIndex]);
-        loadImports();
-        loadProducts();
-        updateStats();
-    }
-}
-
 async function loadImports() {
     imports = await getImports();
     products = await getProducts();
@@ -362,88 +308,73 @@ async function loadImports() {
     });
 }
 
-// ===== EXPORT CRUD =====
-async function editExport(index) {
-    exports = await getExports();
-    const exportItem = exports[index];
-    document.getElementById('exportDate').value = exportItem.export_date;
-    document.getElementById('exportProduct').value = exportItem.product_code;
-    document.getElementById('exportQuantity').value = exportItem.quantity;
-    document.getElementById('exportUnitPrice').value = exportItem.sell_price;
-    document.getElementById('exportTotal').value = exportItem.total_amount;
-    document.getElementById('exportCustomer').value = exportItem.customer;
-    // Đổi nút
-    document.querySelector('#export .btn-success').textContent = "💾 Cập nhật phiếu bán";
-    editingExportIndex = index;
+async function editImport(index) {
+    const imports = await getImports();
+    const importItem = imports[index];
+    document.getElementById('importDate').value = importItem.import_date;
+    document.getElementById('importProduct').value = importItem.product_code;
+    document.getElementById('importQuantity').value = importItem.quantity;
+    document.getElementById('importUnitPrice').value = importItem.import_price;
+    document.getElementById('importTotal').value = importItem.total_amount;
+    document.getElementById('importNote').value = importItem.note;
+    window.editingImportId = importItem.id;
+    const btn = document.getElementById('importSaveBtn') || document.querySelector('#import .btn-success');
+    if (btn) btn.textContent = "💾 Cập nhật phiếu nhập";
 }
 
-async function addExport() {
-    products = await getProducts();
-    exports = await getExports();
-    const date = document.getElementById('exportDate').value;
-    const productCode = document.getElementById('exportProduct').value;
-    const quantity = parseInt(document.getElementById('exportQuantity').value) || 0;
-    const customer = document.getElementById('exportCustomer').value;
-
-    if (!date || !productCode || quantity <= 0 || !customer) {
-        alert('Vui lòng nhập đầy đủ thông tin!');
+async function updateImportFromForm() {
+    console.log('Gọi updateImportFromForm với id:', window.editingImportId);
+    const id = window.editingImportId;
+    if (!id) {
+        alert('Không xác định được phiếu nhập để cập nhật!');
         return;
     }
-
-    const product = products.find(p => p.code === productCode);
-    if (!product) {
-        alert('Sản phẩm không tồn tại!');
+    const import_date = document.getElementById('importDate').value;
+    const product_code = document.getElementById('importProduct').value;
+    const quantity = parseInt(document.getElementById('importQuantity').value) || 0;
+    const import_price = parseFloat(document.getElementById('importUnitPrice').value) || 0;
+    const total_amount = parseFloat(document.getElementById('importTotal').value) || 0;
+    const note = document.getElementById('importNote').value;
+    const updates = { import_date, product_code, quantity, import_price, total_amount, note };
+    const { error } = await supabaseClient.from('imports').update(updates).eq('id', id);
+    console.log('Kết quả update:', { error, updates, id });
+    if (error) {
+        alert('Lỗi cập nhật phiếu nhập: ' + error.message);
         return;
     }
-
-    // Lấy đúng giá bán từ products và tính thành tiền
-    const sellPrice = product.sell_price;
-    const totalAmount = sellPrice * quantity;
-
-    const exportRecord = {
-        export_date: date,
-        product_code: productCode,
-        quantity: quantity,
-        sell_price: sellPrice,
-        total_amount: totalAmount,
-        customer: customer
-    };
-
-    console.log('Export record gửi lên Supabase:', exportRecord);
-
-    const ok = await addExport(exportRecord);
-    if (ok) {
-        alert('Đã lưu phiếu bán!');
-        loadExports();
-        loadProducts();
-        updateProductSelects();
-        updateStats();
-        document.getElementById('exportQuantity').value = '';
-        document.getElementById('exportCustomer').value = '';
-        document.getElementById('exportUnitPrice').value = '';
-        document.getElementById('exportTotal').value = '';
-    }
+    alert('Đã cập nhật phiếu nhập!');
+    window.editingImportId = null;
+    const btn = document.getElementById('importSaveBtn') || document.querySelector('#import .btn-success');
+    if (btn) btn.textContent = "+ THÊM PHIẾU NHẬP";
+    // Reset form
+    document.getElementById('importDate').value = '';
+    document.getElementById('importProduct').value = '';
+    document.getElementById('importQuantity').value = '';
+    document.getElementById('importUnitPrice').value = '';
+    document.getElementById('importTotal').value = '';
+    document.getElementById('importNote').value = '';
+    await refreshAllUI();
 }
 
-async function deleteExport(index) {
-    exports = await getExports();
-    products = await getProducts();
-    if (confirm('Bạn có chắc muốn xóa phiếu bán này?')) {
-        const exportItem = exports[index];
-        const product = products.find(p => p.code === exportItem.product_code);
-        if (product) {
-            product.stock -= exportItem.quantity;
-            product.total_export -= exportItem.quantity;
+async function deleteImport(index) {
+    const imports = await getImports();
+    const importItem = imports[index];
+    if (!importItem || !importItem.id) {
+        alert('Không xác định được phiếu nhập để xóa!');
+        return;
+    }
+    if (confirm('Bạn có chắc muốn xóa phiếu nhập này?')) {
+        const { error } = await supabaseClient.from('imports').delete().eq('id', importItem.id);
+        if (error) {
+            alert('Lỗi xóa phiếu nhập: ' + error.message);
+            return;
         }
-        exports.splice(index, 1);
-        await updateProduct(editingProductIndex || products.length - 1, product);
-        await updateProduct(editingExportIndex || exports.length - 1, exports[editingExportIndex]);
-        loadExports();
-        loadProducts();
-        updateStats();
+        alert('Đã xóa phiếu nhập!');
+        await refreshAllUI();
     }
 }
 
+// ===== EXPORT CRUD =====
 async function loadExports() {
     exports = await getExports();
     products = await getProducts();
@@ -469,6 +400,72 @@ async function loadExports() {
         `;
         tbody.innerHTML += row;
     });
+}
+
+async function editExport(index) {
+    const exports = await getExports();
+    const exportItem = exports[index];
+    document.getElementById('exportDate').value = exportItem.export_date;
+    document.getElementById('exportProduct').value = exportItem.product_code;
+    document.getElementById('exportQuantity').value = exportItem.quantity;
+    document.getElementById('exportUnitPrice').value = exportItem.sell_price;
+    document.getElementById('exportTotal').value = exportItem.total_amount;
+    document.getElementById('exportCustomer').value = exportItem.customer;
+    window.editingExportId = exportItem.id;
+    const btn = document.querySelector('#export .btn-success');
+    if (btn) btn.textContent = "💾 Cập nhật phiếu bán";
+}
+
+async function updateExportFromForm() {
+    console.log('Gọi updateExportFromForm với id:', window.editingExportId);
+    const id = window.editingExportId;
+    if (!id) {
+        alert('Không xác định được phiếu bán để cập nhật!');
+        return;
+    }
+    const export_date = document.getElementById('exportDate').value;
+    const product_code = document.getElementById('exportProduct').value;
+    const quantity = parseInt(document.getElementById('exportQuantity').value) || 0;
+    const sell_price = parseFloat(document.getElementById('exportUnitPrice').value) || 0;
+    const total_amount = parseFloat(document.getElementById('exportTotal').value) || 0;
+    const customer = document.getElementById('exportCustomer').value;
+    const updates = { export_date, product_code, quantity, sell_price, total_amount, customer };
+    const { error } = await supabaseClient.from('exports').update(updates).eq('id', id);
+    console.log('Kết quả update:', { error, updates, id });
+    if (error) {
+        alert('Lỗi cập nhật phiếu bán: ' + error.message);
+        return;
+    }
+    alert('Đã cập nhật phiếu bán!');
+    window.editingExportId = null;
+    const btn = document.querySelector('#export .btn-success');
+    if (btn) btn.textContent = "➕ Thêm phiếu bán";
+    // Reset form
+    document.getElementById('exportDate').value = '';
+    document.getElementById('exportProduct').value = '';
+    document.getElementById('exportQuantity').value = '';
+    document.getElementById('exportUnitPrice').value = '';
+    document.getElementById('exportTotal').value = '';
+    document.getElementById('exportCustomer').value = '';
+    await refreshAllUI();
+}
+
+async function deleteExport(index) {
+    const exports = await getExports();
+    const exportItem = exports[index];
+    if (!exportItem || !exportItem.id) {
+        alert('Không xác định được phiếu bán để xóa!');
+        return;
+    }
+    if (confirm('Bạn có chắc muốn xóa phiếu bán này?')) {
+        const { error } = await supabaseClient.from('exports').delete().eq('id', exportItem.id);
+        if (error) {
+            alert('Lỗi xóa phiếu bán: ' + error.message);
+            return;
+        }
+        alert('Đã xóa phiếu bán!');
+        await refreshAllUI();
+    }
 }
 
 // ===== UI/UX & FILTER =====
@@ -512,8 +509,8 @@ async function updateStats() {
     imports = await getImports();
     exports = await getExports();
     const totalProducts = Array.isArray(products) ? products.length : 0;
-    const totalImportValue = (Array.isArray(imports) ? imports : []).reduce((total, importItem) => total + (importItem?.total || 0), 0);
-    const totalExportValue = (Array.isArray(exports) ? exports : []).reduce((total, exportItem) => total + (exportItem?.total || 0), 0);
+    const totalImportValue = (Array.isArray(imports) ? imports : []).reduce((total, importItem) => total + (importItem?.total_amount || 0), 0);
+    const totalExportValue = (Array.isArray(exports) ? exports : []).reduce((total, exportItem) => total + (exportItem?.total_amount || 0), 0);
     const totalProfit = totalExportValue - totalImportValue;
     document.getElementById('totalProducts').textContent = totalProducts;
     document.getElementById('totalImportValue').textContent = formatCurrency(totalImportValue);
@@ -855,4 +852,52 @@ if (document.getElementById('exportProduct')) {
 }
 if (document.getElementById('exportQuantity')) {
     document.getElementById('exportQuantity').oninput = calculateExportTotal;
+}
+
+// Gắn lại sự kiện cho nút lưu/cập nhật phiếu bán
+if (document.querySelector('#export .btn-success')) {
+    document.querySelector('#export .btn-success').onclick = function() {
+        if (window.editingExportId) {
+            updateExportFromForm();
+        } else {
+            addExport();
+        }
+    };
+}
+
+// Gắn lại sự kiện cho nút lưu/cập nhật sản phẩm
+if (document.querySelector('#products .btn-primary')) {
+    document.querySelector('#products .btn-primary').onclick = function() {
+        if (window.editingProductId) {
+            updateProductFromForm();
+        } else {
+            addProductFromForm();
+        }
+    };
+}
+
+function attachExportButtonHandler() {
+    const btn = document.getElementById('exportSaveBtn');
+    if (btn) {
+        btn.onclick = function() {
+            if (window.editingExportId) {
+                updateExportFromForm();
+            } else {
+                addExport();
+            }
+        };
+    }
+}
+
+function attachImportButtonHandler() {
+    const btn = document.getElementById('importSaveBtn');
+    if (btn) {
+        btn.onclick = function() {
+            if (window.editingImportId) {
+                updateImportFromForm();
+            } else {
+                addImport();
+            }
+        };
+    }
 } 
