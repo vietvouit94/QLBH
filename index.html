@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hệ thống quản lý nhập-bán hàng</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="assets/js/qlbh.js"></script>
 </head>
 <body>
     <div class="container">
@@ -125,17 +128,17 @@
                     </div>
                     <div class="form-group">
                         <label>Sản phẩm:</label>
-                        <select id="importProduct">
+                        <select id="importProduct" onchange="updateImportPrice()">
                             <option value="">Chọn sản phẩm</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Số lượng nhập:</label>
-                        <input type="number" id="importQuantity" placeholder="0">
+                        <input type="number" id="importQuantity" placeholder="0" oninput="calculateImportTotal()">
                     </div>
                     <div class="form-group">
                         <label>Đơn giá nhập:</label>
-                        <input type="number" id="importUnitPrice" placeholder="0" readonly>
+                        <input type="number" id="importUnitPrice" placeholder="0" readonly oninput="calculateImportTotal()">
                     </div>
                 </div>
                 <div class="form-row">
@@ -334,9 +337,5 @@
             </div>
         </div>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-    <script src="assets/js/qlbh.js"></script>
 </body>
 </html>
