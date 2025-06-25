@@ -900,4 +900,60 @@ function attachImportButtonHandler() {
             }
         };
     }
+}
+
+async function addExport() {
+    try {
+        // Lấy giá trị từ form
+        const productCode = document.getElementById('exportProduct').value;
+        const quantity = parseInt(document.getElementById('exportQuantity').value);
+        const sellPrice = parseFloat(document.getElementById('exportUnitPrice').value);
+        const date = document.getElementById('exportDate').value;
+        const customer = document.getElementById('exportCustomer').value || '';
+
+        // Kiểm tra dữ liệu đầu vào
+        if (!productCode || !quantity || !sellPrice || !date) {
+            alert('Vui lòng nhập đầy đủ thông tin!');
+            return;
+        }
+
+        // Tính thành tiền
+        const totalAmount = quantity * sellPrice;
+
+        // Tạo object insert đúng chuẩn bảng exports
+        const exportRecord = {
+            product_code: productCode,
+            quantity: quantity,
+            sell_price: sellPrice,
+            export_date: date,
+            total_amount: totalAmount,
+            customer: customer
+        };
+
+        // Insert vào Supabase
+        const { data, error } = await supabaseClient
+            .from('exports')
+            .insert([exportRecord])
+            .select();
+
+        if (error) {
+            alert('Lỗi insert: ' + error.message);
+            return;
+        }
+
+        alert('Thêm phiếu bán thành công!');
+
+        // Reset form
+        document.getElementById('exportProduct').value = '';
+        document.getElementById('exportQuantity').value = '';
+        document.getElementById('exportUnitPrice').value = '';
+        document.getElementById('exportDate').value = '';
+        document.getElementById('exportCustomer').value = '';
+        document.getElementById('exportTotal').value = '';
+
+        // Cập nhật toàn bộ UI
+        await refreshAllUI();
+    } catch (error) {
+        alert('Có lỗi xảy ra: ' + error.message);
+    }
 } 
